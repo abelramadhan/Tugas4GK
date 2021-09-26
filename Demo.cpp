@@ -30,6 +30,12 @@ void Demo::DeInit() {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
+	glDeleteVertexArrays(1, &VAO2);
+	glDeleteBuffers(1, &VBO2);
+	glDeleteBuffers(1, &EBO2);
+	glDeleteVertexArrays(1, &VAO3);
+	glDeleteBuffers(1, &VBO3);
+	glDeleteBuffers(1, &EBO3);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
