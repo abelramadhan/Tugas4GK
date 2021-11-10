@@ -22,7 +22,7 @@
     <ProjectGuid>{094F841B-B41C-413D-883B-494CF1FAA909}</ProjectGuid>
     <RootNamespace>Lesson02</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Tugas1GK</ProjectName>
+    <ProjectName>TugasGK</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -98,7 +98,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)deps\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)deps\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)deps/lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;SOIL.lib;opengl32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

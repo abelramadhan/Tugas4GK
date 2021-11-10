@@ -21,6 +21,7 @@ void Demo::Init() {
 	BuildGuard();
 	BuildHandle();
 
+
 	InitCamera();
 }
 
@@ -113,7 +114,19 @@ void Demo::ProcessInput(GLFWwindow* window) {
 }
 
 void Demo::Update(double deltaTime) {
-
+	if (angle > 1.0f) {
+		flip = false;
+	}
+	else if (angle < -0.2f) {
+		flip = true;
+	}
+	if (flip) {
+		angle += (float)((deltaTime * 5.0f) / 1000);
+	}
+	else if (!flip) {
+		angle -= (float)((deltaTime * 1.1f) / 1000);
+	}
+	
 }
 
 void Demo::InitCamera()
@@ -121,7 +134,7 @@ void Demo::InitCamera()
 	posCamX = 0.0f;
 	posCamY = 0.4f;
 	posCamZ = 2.0f;
-	viewCamX = 0.0f;
+	viewCamX = -8.0f;
 	viewCamY = 0.1f;
 	viewCamZ = 0.0f;
 	upCamX = 0.0f;
@@ -189,6 +202,11 @@ void Demo::Render() {
 	GLint viewLoc = glGetUniformLocation(this->shaderProgram, "view");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
+	glm::mat4 model;
+	model = glm::rotate(model, angle, glm::vec3(0, 0.2, 1));
+	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
 	DrawBlade();
 	DrawGuard();
 	DrawHandle();
@@ -242,7 +260,7 @@ void Demo::BuildBlade() {
 		5,3,6,
 		7,8,9,
 		8,10,11,
-		8,9,11,
+		11,9,8
 	};
 
 	glGenVertexArrays(1, &VAO);
