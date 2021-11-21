@@ -42,25 +42,22 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="crate.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="marble.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\..\..\..\Downloads\metal.png">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="metal2.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="wood.png">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="wood2.png">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="leather.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="metal_specular.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="wood_specular.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="leather_specular.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

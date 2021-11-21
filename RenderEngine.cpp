@@ -193,9 +193,10 @@ GLuint RenderEngine::BuildShader(const char* vertexPath, const char* fragmentPat
 		Err("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ");
 	}
 	const GLchar* vShaderCode = vertexCode.c_str();
-	const GLchar * fShaderCode = fragmentCode.c_str();
+	const GLchar* fShaderCode = fragmentCode.c_str();
 	// 2. Compile shaders
 	GLuint vertex, fragment;
+
 	// Vertex Shader
 	vertex = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertex, 1, &vShaderCode, NULL);
@@ -210,7 +211,7 @@ GLuint RenderEngine::BuildShader(const char* vertexPath, const char* fragmentPat
 	GLuint geometry;
 	if (geometryPath != nullptr)
 	{
-		const GLchar * gShaderCode = geometryCode.c_str();
+		const GLchar* gShaderCode = geometryCode.c_str();
 		geometry = glCreateShader(GL_GEOMETRY_SHADER);
 		glShaderSource(geometry, 1, &gShaderCode, NULL);
 		glCompileShader(geometry);
