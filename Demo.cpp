@@ -15,11 +15,14 @@ Demo::~Demo() {
 void Demo::Init() {
 	// build and compile our shader program
 	// ------------------------------------
-	shaderProgram = BuildShader("vertexShader.vert", "fragmentShader.frag", nullptr);
+	shadowmapShader = BuildShader("shadowMapping.vert", "shadowMapping.frag", nullptr);
+	depthmapShader = BuildShader("depthMap.vert", "depthMap.frag", nullptr);
+	BuildDepthMap();
 
 	BuildBlade();
 	BuildGuard();
 	BuildHandle();
+	BuildPlane();
 
 	InitCamera();
 }
@@ -36,6 +39,10 @@ void Demo::DeInit() {
 	glDeleteVertexArrays(1, &VAO3);
 	glDeleteBuffers(1, &VBO3);
 	glDeleteBuffers(1, &EBO3);
+	glDeleteVertexArrays(1, &VAOp);
+	glDeleteBuffers(1, &VBOp);
+	glDeleteBuffers(1, &EBOp);
+	glDeleteBuffers(1, &depthMapFBO);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -124,9 +131,9 @@ void Demo::Update(double deltaTime) {
 void Demo::InitCamera()
 {
 	posCamX = 0.0f;
-	posCamY = 0.8f;
-	posCamZ = 4.0f;
-	viewCamX = 2.5f;
+	posCamY = 0.5f;
+	posCamZ = -2.0f;
+	viewCamX = 0.0f;
 	viewCamY = 0.0f;
 	viewCamZ = 0.0f;
 	upCamX = 0.0f;
@@ -173,78 +180,70 @@ void Demo::RotateCamera(float speed)
 
 void Demo::Render() {
 
-	glViewport(0, 0, this->screenWidth, this->screenHeight);
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
+	// Step 1 Render depth of scene to texture
+	// ----------------------------------------
+	glm::mat4 lightProjection, lightView;
+	glm::mat4 lightSpaceMatrix;
+	float near_plane = 1.0f, far_plane = 7.5f;
+	lightProjection = glm::ortho(-1.0f, 1.0f, -1.0f, 5.0f, near_plane, far_plane);
+	lightView = glm::lookAt(glm::vec3(-2.0f, 4.0f, -1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 1.0, 0.0));
+	lightSpaceMatrix = lightProjection * lightView;
+	// render scene from light's point of view
+	UseShader(this->depthmapShader);
+	glUniformMatrix4fv(glGetUniformLocation(this->depthmapShader, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	glViewport(0, 0, this->SHADOW_WIDTH, this->SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	DrawBlade(this->depthmapShader);
+	DrawGuard(this->depthmapShader);
+	DrawHandle(this->depthmapShader);
+	//DrawCube(this->depthmapShader);
+	//DrawPlane(this->depthmapShader);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+
+
+	// Step 2 Render scene normally using generated depth map
+	// ------------------------------------------------------
+	glViewport(0, 0, this->screenWidth, this->screenHeight);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-	//glEnable(GL_CULL_FACE);
-
-	glEnable(GL_DEPTH_TEST);
-
 	// Pass perspective projection matrix
-	glm::mat4 projection = glm::perspective(fovy, (GLfloat)this->screenWidth / (GLfloat)this->screenHeight, 0.1f, 100.0f);
-	GLint projLoc = glGetUniformLocation(this->shaderProgram, "projection");
-	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	UseShader(this->shadowmapShader);
+	glm::mat4 projection = glm::perspective(45.0f, (GLfloat)this->screenWidth / (GLfloat)this->screenHeight, 0.1f, 100.0f);
+	glUniformMatrix4fv(glGetUniformLocation(this->shadowmapShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
 	// LookAt camera (position, target/direction, up)
 	glm::vec3 cameraPos = glm::vec3(posCamX, posCamY, posCamZ);
 	glm::vec3 cameraFront = glm::vec3(viewCamX, viewCamY, viewCamZ);
 	glm::mat4 view = glm::lookAt(cameraPos, cameraFront, glm::vec3(upCamX, upCamY, upCamZ));
-	GLint viewLoc = glGetUniformLocation(this->shaderProgram, "view");
-	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(glGetUniformLocation(this->shadowmapShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-	glm::mat4 model;
-	model = glm::scale(model, glm::vec3(3.0f,3.0f,3.0f));
-	model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
-	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+	// Setting Light Attributes
+	glUniformMatrix4fv(glGetUniformLocation(this->shadowmapShader, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	glUniform3f(glGetUniformLocation(this->shadowmapShader, "viewPos"), cameraPos.x, cameraPos.y, cameraPos.z);
+	glUniform3f(glGetUniformLocation(this->shadowmapShader, "lightPos"), -2.0f, 4.0f, -1.0f);
 
-	// set lighting attributes
-	GLint viewPosLoc = glGetUniformLocation(this->shaderProgram, "viewPos");
-	glUniform3f(viewPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "dirLight.direction"), 0.0f, -1.0f, -1.0f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "dirLight.ambient"), 0.25, 0.25, 0.25);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "dirLight.diffuse"), 0.25, 0.25, 0.25);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "dirLight.specular"), 0.25, 0.25, 0.25);
+	// Configure Shaders
+	glUniform1i(glGetUniformLocation(this->shadowmapShader, "diffuseTexture"), 0);
+	glUniform1i(glGetUniformLocation(this->shadowmapShader, "shadowMap"), 1);
+	
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ZERO);
 
-	// point light 1
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[0].position"), 1.0f, 0.8f, -1.0f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[0].ambient"), 1.0f, 0.5f, 0.5f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[0].diffuse"), 1.0f, 0.5f, 0.5f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[0].specular"), 1.0f, 0.5f, 0.5f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[0].constant"), 1.0f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[0].linear"), 0.5f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[0].quadratic"), 0.032f);
+	DrawPlane(this->shadowmapShader);
+	if (!rotate) {
+		glBlendFunc(GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR);
+	}
+	DrawBlade(this->shadowmapShader);
+	DrawGuard(this->shadowmapShader);
+	DrawHandle(this->shadowmapShader);
 
-	// point light 2
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[1].position"), -3.0f, -1.0f, 3.0f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[1].ambient"), 0.5f, 0.5f, 1.0f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[1].diffuse"), 0.5f, 0.5f, 1.0f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "pointLights[1].specular"), 0.5f, 0.5f, 1.0f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[1].constant"), 1.0f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[1].linear"), 0.09f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "pointLights[1].quadratic"), 0.032f);
-
-	// spotLight
-	glUniform3fv(glGetUniformLocation(this->shaderProgram, "spotLight.position"), 1, &cameraPos[0]);
-	glUniform3fv(glGetUniformLocation(this->shaderProgram, "spotLight.direction"), 1, &cameraFront[0]);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "spotLight.ambient"), 0.5f, 1.0f, 0.5f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "spotLight.diffuse"), 0.5f, 1.0f, 0.5f);
-	glUniform3f(glGetUniformLocation(this->shaderProgram, "spotLight.specular"), 0.5f, 1.0f, 0.5f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "spotLight.constant"), 1.0f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "spotLight.linear"), 0.09f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "spotLight.quadratic"), 0.032f);
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "spotLight.cutOff"), glm::cos(glm::radians(8.5f)));
-	glUniform1f(glGetUniformLocation(this->shaderProgram, "spotLight.outerCutOff"), glm::cos(glm::radians(15.0f)));
-
-
-
-	DrawBlade();
-	DrawGuard();
-	DrawHandle();
-
+	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 }
 
@@ -266,16 +265,6 @@ void Demo::BuildBlade() {
 	SOIL_free_image_data(image);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glGenTextures(1, &stexture);
-	glBindTexture(GL_TEXTURE_2D, stexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	image = SOIL_load_image("metal_specular.png", &width, &height, 0, SOIL_LOAD_RGBA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	SOIL_free_image_data(image);
-	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -354,20 +343,19 @@ void Demo::BuildBlade() {
 
 }
 
-void Demo::DrawBlade()
+void Demo::DrawBlade(GLuint shader)
 {
-	UseShader(this->shaderProgram);
+	UseShader(shader);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.diffuse"), 0);
-
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, stexture);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.specular"), 1);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
 
-	GLint shininessMatLoc = glGetUniformLocation(this->shaderProgram, "material.shininess");
-	glUniform1f(shininessMatLoc, 0.1f);
+	glm::mat4 model;
+	model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	GLint modelLoc = glGetUniformLocation(shader, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 	glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 
@@ -375,7 +363,6 @@ void Demo::DrawBlade()
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
-
 }
 
 void Demo::BuildGuard() {
@@ -393,15 +380,6 @@ void Demo::BuildGuard() {
 	unsigned char* image = SOIL_load_image("wood2.png", &width, &height, 0, SOIL_LOAD_RGBA);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
-	SOIL_free_image_data(image);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glGenTextures(1, &stexture2);
-	glBindTexture(GL_TEXTURE_2D, stexture2);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	image = SOIL_load_image("wood_specular.png", &width, &height, 0, SOIL_LOAD_RGBA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	SOIL_free_image_data(image);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -561,20 +539,19 @@ void Demo::BuildGuard() {
 
 }
 
-void Demo::DrawGuard()
+void Demo::DrawGuard(GLuint shader)
 {
-	UseShader(this->shaderProgram);
+	UseShader(shader);
 
-	glActiveTexture(GL_TEXTURE2);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture2);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.diffuse"), 2);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
 
-	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_2D, stexture2);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.specular"), 3);
-
-	GLint shininessMatLoc = glGetUniformLocation(this->shaderProgram, "material.shininess");
-	glUniform1f(shininessMatLoc, 0.025f);
+	glm::mat4 model;
+	model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	GLint modelLoc = glGetUniformLocation(shader, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 	glBindVertexArray(VAO2); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 
@@ -600,15 +577,6 @@ void Demo::BuildHandle() {
 	unsigned char* image = SOIL_load_image("leather.png", &width, &height, 0, SOIL_LOAD_RGBA);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
-	SOIL_free_image_data(image);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glGenTextures(1, &stexture3);
-	glBindTexture(GL_TEXTURE_2D, stexture3);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	image = SOIL_load_image("leather_specular.png", &width, &height, 0, SOIL_LOAD_RGBA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	SOIL_free_image_data(image);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -690,20 +658,19 @@ void Demo::BuildHandle() {
 
 }
 
-void Demo::DrawHandle ()
+void Demo::DrawHandle (GLuint shader)
 {
-	UseShader(this->shaderProgram);
+	UseShader(shader);
 
-	glActiveTexture(GL_TEXTURE4);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture3);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.diffuse"), 4);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
 
-	glActiveTexture(GL_TEXTURE5);
-	glBindTexture(GL_TEXTURE_2D, stexture3);
-	glUniform1i(glGetUniformLocation(this->shaderProgram, "material.specular"), 5);
-
-	GLint shininessMatLoc = glGetUniformLocation(this->shaderProgram, "material.shininess");
-	glUniform1f(shininessMatLoc, 0.08f);
+	glm::mat4 model;
+	model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+	GLint modelLoc = glGetUniformLocation(shader, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 	glBindVertexArray(VAO3); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 
@@ -711,7 +678,105 @@ void Demo::DrawHandle ()
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
+}
 
+void Demo::BuildPlane()
+{
+	// Load and create a texture 
+	glGenTextures(1, &texturep);
+	glBindTexture(GL_TEXTURE_2D, texturep);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	int width, height;
+	unsigned char* image = SOIL_load_image("wood.png", &width, &height, 0, SOIL_LOAD_RGBA);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	SOIL_free_image_data(image);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Build geometry
+	GLfloat vertices[] = {
+		// format position, tex coords
+		// bottom
+		-25.0f,	-0.5f, -25.0f,  0,  0, 0.0f,  1.0f,  0.0f,
+		25.0f,	-0.5f, -25.0f, 25,  0, 0.0f,  1.0f,  0.0f,
+		25.0f,	-0.5f,  25.0f, 25, 25, 0.0f,  1.0f,  0.0f,
+		-25.0f,	-0.5f,  25.0f,  0, 25, 0.0f,  1.0f,  0.0f,
+	};
+
+	GLuint indices[] = { 0,  2,  1,  0,  3,  2 };
+
+	glGenVertexArrays(1, &VAOp);
+	glGenBuffers(1, &VBOp);
+	glGenBuffers(1, &EBOp);
+
+	glBindVertexArray(VAOp);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBOp);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOp);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// Position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), 0);
+	glEnableVertexAttribArray(0);
+	// TexCoord attribute
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+	// Normal attribute
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(5 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(2);
+
+	glBindVertexArray(0); // Unbind VAO
+}
+
+void Demo::DrawPlane(GLuint shader)
+{
+	UseShader(shader);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texturep);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+
+	glm::mat4 model;
+	model = glm::translate(model, glm::vec3(0, 0.2f, 0));
+	GLint modelLoc = glGetUniformLocation(shader, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+	glBindVertexArray(VAOp); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindVertexArray(0);
+}
+
+void Demo::BuildDepthMap() {
+	// configure depth map FBO
+	// -----------------------
+	glGenFramebuffers(1, &depthMapFBO);
+	// create depth texture
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, this->SHADOW_WIDTH, this->SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	// attach depth texture as FBO's depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int main(int argc, char** argv) {

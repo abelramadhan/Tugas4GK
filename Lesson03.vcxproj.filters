@@ -40,6 +40,18 @@
     <None Include="vertexShader.vert">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="depthMap.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shadowMapping.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shadowMapping.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="depthMap.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="metal2.png">
@@ -51,13 +63,7 @@
     <Image Include="leather.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="metal_specular.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="wood_specular.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="leather_specular.png">
+    <Image Include="wood.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

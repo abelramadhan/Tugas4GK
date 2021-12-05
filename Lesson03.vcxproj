@@ -141,16 +141,18 @@
     <ClInclude Include="RenderEngine.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="depthMap.frag" />
+    <None Include="depthMap.vert" />
     <None Include="fragmentShader.frag" />
+    <None Include="shadowMapping.frag" />
+    <None Include="shadowMapping.vert" />
     <None Include="vertexShader.vert" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="leather.png" />
-    <Image Include="leather_specular.png" />
     <Image Include="metal2.png" />
-    <Image Include="metal_specular.png" />
+    <Image Include="wood.png" />
     <Image Include="wood2.png" />
-    <Image Include="wood_specular.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
